@@ -2,7 +2,7 @@
 #Genomic Variation Laboratory
 #12/17/2024
 #Data Cleaning, Merging and Visualizing Quantification Amplification Results and Cq Values CSV files from the Bio-Rad CFX96 Maestro Software.
-----
+#----
   
 library(tidyverse)
 library(dplyr)
@@ -15,7 +15,7 @@ conflict_prefer("filter", "dplyr")
 conflict_prefer("summarize", "dplyr")
 
 # Import data
-data <- read_csv("/Users/andersontate/Documents/UCDavis/GVL/eDNA_USGS_VernalPools/LabNotebook/Spadefoot qPCR/USGS_SPHA_03_Final/SPHA3_redo2_QuantAmpResults.csv") # Import the Quantification Amplification Results CSV file.
+data <- read_csv("/Users/andersontate/Documents/UCDavis/GVL/eDNA_USGS_VernalPools/LabNotebook/Spadefoot qPCR/USGS_SPHA_11/Anderson_2025-01-03_SPHA11_DM -  Quantification Amplification Results_FAM.csv") # Import the Quantification Amplification Results CSV file.
 
 # Tidy data to long form from CFX96
 datatib <- tibble(data) #Create a tibble
@@ -33,10 +33,10 @@ datatidy <- datatib %>% pivot_longer(cols = -Cycle,# Long form for tidy data. Be
 #Excelsamplenames <- Excelsampledata[[1]]  # Assuming sample names are in the first column
 
 # Load the sample names from the CSV file
-platemap <- read_csv("/Users/andersontate/Documents/UCDavis/GVL/eDNA_USGS_VernalPools/LabNotebook/Spadefoot qPCR/USGS_SPHA_03_Final/samplenames.csv")
+platemap <- read_csv("/Users/andersontate/Documents/UCDavis/GVL/eDNA_USGS_VernalPools/LabNotebook/Spadefoot qPCR/USGS_SPHA_11/qPCR_PlateMap_SPHA11.csv")
 
 # Load the Cq values BioRad Cq output CSV file
-Cq <- read_csv("/Users/andersontate/Documents/UCDavis/GVL/eDNA_USGS_VernalPools/LabNotebook/Spadefoot qPCR/USGS_SPHA_03_Final/SPHA3Cq.csv")
+Cq <- read_csv("/Users/andersontate/Documents/UCDavis/GVL/eDNA_USGS_VernalPools/LabNotebook/Spadefoot qPCR/USGS_SPHA_11/Anderson_2025-01-03_SPHA11_DM -  Quantification Cq Results.csv")
 
 #Subset Cq values to only wells and Cq values
 Cq2 <- Cq[, c("Well", "Cq")]
@@ -44,7 +44,8 @@ Cq2 <- Cq[, c("Well", "Cq")]
 Cq2$Well <- gsub("^(\\w)(0+)(\\d+)$", "\\1\\3", Cq2$Well)
 
 # Extract sample names into a vector
-samplenames <- platemap[[2]]  # Assuming sample names are in the second column. Taken from plates maps in BOX folder for each qPCR plate. Sample names are exported from Excel to CSV as above.
+samplenames <- platemap[[2]]# Assuming sample names are in the second column. Taken from plates maps in BOX folder for each qPCR plate. Sample names are exported from Excel to CSV as above.
+sitenames <- platemap[[3]]
 
 # Create a 96-well plate layout
 rows <- LETTERS[1:8]   # Rows A to H
@@ -61,6 +62,7 @@ plate$Well <- paste0(plate$Row, plate$Col)    # Combine rows and columns into we
 
 # Group wells in sets of three by column
 plate$Sample <- rep(samplenames, each = 3, length.out = nrow(plate))
+plate$Site <- rep(sitenames, each = 3, length.out = nrow(plate))
 
 # Sort by column order (column-major order), this may not be necessary
 plate <- plate[order(plate$Col, plate$Row), ]
@@ -81,7 +83,7 @@ datamerged <- datamerged %>%
     Well_Cq = paste0(Well, " (Cq: ", Cq, ")"))
 
 #subset the data to only have three wells of the sample replicates. Change the wellgroups number for a certain set of three wells. Organized by column with three replicates in each. See wellgroups in the Environment for the corresponding numbers.
-subset <- subset(datamerged, Well %in% wellgroups[[9]]) 
+subset <- subset(datamerged, Well %in% wellgroups[[3]]) 
 
 # Basic graph plotting amplification. Can use the subset here or the tidy format for more specific wells. Don't specify any cols if you want the entire dataset.
 ggplot(data = subset, aes(x = Cycle, y = RFU, group = Well_Cq)) + 
@@ -99,22 +101,22 @@ dataunique <- datamerged %>%
 
 # Calculate the sum of Cq_Less_Than_40 for each sample
 samplesums <- dataunique %>%
-  group_by(Sample) %>%
+  group_by(Sample, Site) %>%
   summarize(Sum_Cq_Less_Than_40 = sum(Cq_Less_Than_40))
 
 # Merge the calculated sums back into data_unique
 dataunique <- dataunique %>%
   left_join(samplesums, by = "Sample")
 
-# Summarize the data by groups of 3 wells
-summarytable <- dataunique %>%
-  group_by(Group) %>%
-  summarize(
-    Samples = paste(unique(Sample), collapse = ", "),  # Combine sample names
-    Sum_Cq_Less_Than_40 = sum(Cq_Less_Than_40))
+# Summarize the data by groups of 3 wells, this may not be necessary
+#summarytable <- dataunique %>%
+  #group_by(Group) %>%
+  #summarize(
+    #Samples = paste(unique(Sample), collapse = ", "),  # Combine sample names
+    #Sum_Cq_Less_Than_40 = sum(Cq_Less_Than_40))
 #Create a directory to write files into
 #dir.create("OutputTables", recursive = TRUE)
 # Write file
-write.csv(samplesums, "/Users/andersontate/Documents/UCDavis/GVL/eDNA_USGS_VernalPools/Coding/RWorkDir/OutputTables/SampleCqSums.csv", row.names = FALSE)
+write.csv(samplesums, "/Users/andersontate/Documents/UCDavis/GVL/eDNA_USGS_VernalPools/Coding/RWorkDir/OutputTables/SampleCqSumsSPHA11.csv", row.names = FALSE)
 
     
